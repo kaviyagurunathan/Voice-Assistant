@@ -1,0 +1,230 @@
+import random
+import time
+from re import search
+import winshell
+import ctypes
+import wikipedia
+import os
+import datetime
+import pyttsx3
+import warnings
+import speech_recognition as sr
+import webbrowser
+import smtplib
+import requests
+import ctypes
+
+from pyjokes import pyjokes
+from twilio.rest import Client
+import pickle
+import os.path
+from googleapiclient.discovery import build
+from google_auth_oauthlib.flow import InstalledAppFlow
+from google.auth.transport.requests import Request
+from selenium import webdriver
+from time import sleep
+import _json
+
+warnings.filterwarnings("ignore")
+
+engine = pyttsx3.init()
+voices = engine.getProperty("voices")
+engine.setProperty("voice", 50)
+
+recognizer = sr.Recognizer()
+
+def talk(audio):
+    engine.say(audio)
+    engine.runAndWait()
+
+def rec_audio():
+    with sr.Microphone() as source:
+        print("Listening...")
+        audio = recognizer.listen(source)
+
+    try:
+        data = recognizer.recognize_google(audio)
+        print("You said: " + data)
+        return data.lower()
+    except sr.UnknownValueError:
+        print("Assistant could not understand the audio")
+        return ""
+    except sr.RequestError as ex:
+        print("Request Error from Google Speech Recognition: " + str(ex))
+        return ""
+
+def response(text):
+    engine.say(text)
+    engine.runAndWait()
+
+def send_email(to, content):
+    server = smtplib.SMTP("smtp.gmail.com", 587)
+    server.ehlo()
+    server.starttls()
+
+    # Enable low security in gmail
+    server.login("email", "pass")
+    server.sendmail("email", to, content)
+    server.close()
+
+def today_date():
+    return datetime.datetime.now().strftime("%Y-%m-%d")
+
+def current_time():
+    now = datetime.datetime.now()
+    meridiem = "a.m." if now.hour < 12 else "p.m."
+    hour = now.hour if now.hour <= 12 else now.hour - 12
+    minute = f"{now.minute:02}"
+    return f"It is {hour}:{minute} {meridiem}."
+
+def handle_wikipedia_query(query):
+    try:
+        summary = wikipedia.summary(query, sentences=1)
+        return summary
+    except wikipedia.exceptions.DisambiguationError as e:
+        return f"There are multiple results for '{query}'. Please be more specific."
+    except Exception as e:
+        return "I couldn't find any information on that."
+
+# Main loop for the assistant
+def change_wallpaper(img):
+    pass
+
+while True:
+    try:
+        text = rec_audio()
+        speak = ""
+
+        if "hello" in text or "hi" in text:
+            speak += "Hello! How can I assist you?"
+
+        elif "date" in text:
+            get_today = today_date()
+            speak += "Today's date is " + get_today
+
+        elif "time" in text:
+            speak += current_time()
+
+        elif "who is" in text or "what is" in text:
+            query = text.replace("who is", "").replace("what is", "").strip()
+            if query:
+                speak += handle_wikipedia_query(query)
+
+        elif "how are you" in text:
+            speak+="I am fine, Thanyou for asking me!"
+
+        elif "google" in text:
+            os.startfile("https://www.google.com")
+            speak += "Opening Google."
+
+        elif "youtube" in text.lower():
+            speak = speak + "Opening youtube"
+            os.startfile("https://www.youtube.com")
+
+        elif "gpt"in text.lower():
+            speak = speak + "Opening gpt"
+            os.startfile("https://chatgpt.com/?model=auto")
+
+        elif "chrome" in text:
+            # Adjust the path to Chrome executable if needed
+            os.startfile("https://www.chrome.com")
+            speak += "Opening Google Chrome."
+
+#----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+        if "youtube" in text:
+            ind = text.split().index("youtube")
+            search_terms = text.split()[ind + 1:]  # Get search terms after "youtube"
+            if search_terms:
+                search_query = "+".join(search_terms)  # Join terms with '+' for URL
+                print(f"YouTube Search Query: {search_query}")  # Debugging output
+                webbrowser.open("https://www.youtube.com/results?search_query=" + search_query)
+                talk("Opening " + " ".join(search_terms) + " on YouTube.")
+            else:
+                talk("Please specify what you want to search for on YouTube.")
+
+        elif "search" in text:
+            ind = text.split().index("search")
+            search = text.split()[ind + 1:]
+            webbrowser.open(
+                "https://www.google.com/search?q=" + "+".join(search)
+            )
+            speak += "Opening " + " ".join(search) + " on Google."
+
+        elif "Choose background" in text or "change wallpaper" in text:
+            speak = speak + "Choose your wallpaper"
+            img = r"C:\Users\WELCOME\Pictures\Wallpapers"  # Use a raw string for the image path
+            os.startfile(img)
+            #speak += "Wallpaper changed successfully."
+        elif "empty recycle bin" in text:
+            winshell.recycle_bin().empty(
+                confirm=True,show_progress=False,sound=True
+            )
+            speak = speak + "Recycle bin emptied"
+
+        elif "email to computer" in text or "gmail to computer" in text:
+            try:
+                talk("What should I say?")
+                content = rec_audio()
+                to = "Receiver email address"
+                send_email(to, content)
+                speak = speak + "Email has been sent !"
+            except Exception as e:
+                print(e)
+                talk("I am not able to send this email")
+
+        elif "mail" in text or "email" in text or "gmail" in text:
+            try:
+                talk("What should I say?")
+                content = rec_audio()
+                talk("whom should i send")
+                to = input("Enter To Address: ")
+                send_email(to, content)
+                speak = speak + "Email has been sent !"
+            except Exception as e:
+                print(e)
+                speak = speak + "I am not able to send this email"
+
+        elif "joke" in text:
+            speak = speak + pyjokes.get_joke()
+        elif "what is the weather in" in text:
+            key = "826c1dec506342f0de9fe6a1781f5de4"
+            weather_url = "https://api.openweathermap.org/data/2.5/weather?"
+            ind = text.split().index("in")
+            location = text.split()[ind + 1:]
+            location = "".join(location)
+            url = weather_url + "appid=" + key + "&q=" + location
+            js = requests.get(url).json()
+            if js["cod"] != "404":
+                weather = js["main"]
+                temperature = weather["temp"]
+                temperature = temperature - 273.15
+                humidity = weather["humidity"]
+                desc = js["weather"][0]["description"]
+                weatherResponse = " The temperature in Celcius is " + str(temperature) + " The humidity is " + str(
+                    humidity) + " and The weather description is " + str(desc)
+                speak = speak + weatherResponse
+
+
+            else:
+                speak = speak + "City Not Found"
+
+        elif "exit" in text or "stop" in text or "see you later" in text:
+            speak += "Bye Kaviya! Nice to Meet you Kaviya!, and i expect for you will be came here again"
+            response(speak)
+            break
+
+
+        else:
+
+            speak += "."
+
+            #speak += handle_wikipedia_query(text)
+
+
+
+        response(speak)
+
+    except Exception as e:
+        print(f"An error occurred: {e}")
+        response("I encountered an error, please try again.")
+
